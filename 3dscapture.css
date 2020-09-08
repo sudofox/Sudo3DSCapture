@@ -13,6 +13,13 @@ div#buttons {
     margin-bottom: 5px;
 }
 
+div#split-canvas-container {
+    width: 400px;
+}
+
+canvas#bottomscreen {
+    margin: 0 auto;
+}
 /* 
 #canvas-container {
     border:1px solid black;

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Sudo3DSCapture</title>
     <script type="text/javascript" src="./3dscapture.js"></script>
-    <link rel="stylesheet" href="./3dscapture.css">
+    <link rel="stylesheet" href="./3dscapture.css?1">
 </head>
 
 <body>
@@ -31,10 +31,11 @@
     <div id="canvas-container" style="display: none;">
         <canvas id="screen" width="240" height="720"></canvas>
     </div>
-    <div id="split-canvas-container" style="display: block;">
-        <canvas id="topscreen" width="240" height="400"></canvas>
-        <canvas id="bottomscreen" width="240" height="320"></canvas>
+    <div id="split-canvas-container" style="display: grid;">
+        <canvas id="topscreen" width="400" height="240"></canvas>
+        <canvas id="bottomscreen" width="320" height="240"></canvas>
     </div>
+
     <script>
         document.getElementById("frame_delay_select").value = pollFrequency;
     </script>

@@ -168,7 +168,7 @@ async function getFrame() {
             console.error("error thingy");
         }
 
-    //} while (bytesIn < bytesNeeded)
+        //} while (bytesIn < bytesNeeded)
 
     } while (false);
 
@@ -178,6 +178,8 @@ async function getFrame() {
 
 }
 
+var topOffset = 239;
+var btmOffset = 239;
 
 async function writeResult(result) {
 
@@ -227,25 +229,50 @@ async function writeResult(result) {
             var bottomImage = bottomContext.createImageData(bottomScreen.width, bottomScreen.height);
 
             // foreach number of pixels
-            for (var i = 0; i < 172800; i++) {
-                readPos = i + frameStartOffset;
-                //if ((readPos * 3) + 2 < result.byteLength - byteLengthOffset) {
-                if (i < 96000) {
-                    topImage.data[(4 * i) + 0] = result[(3 * readPos) + rOrder]; // ?? 0xFF;
-                    topImage.data[(4 * i) + 1] = result[(3 * readPos) + gOrder]; // ?? 0xFF;
-                    topImage.data[(4 * i) + 2] = result[(3 * readPos) + bOrder]; // ?? 0xFF;
-                    topImage.data[(4 * i) + 3] = 0xFF;
-                } else {
-                    bottomOffset = i - 96000;
-                    bottomImage.data[(4 * bottomOffset) + 0] = result[(3 * readPos) + rOrder]; // ?? 0xFF;
-                    bottomImage.data[(4 * bottomOffset) + 1] = result[(3 * readPos) + gOrder]; // ?? 0xFF;
-                    bottomImage.data[(4 * bottomOffset) + 2] = result[(3 * readPos) + bOrder]; // ?? 0xFF;
-                    bottomImage.data[(4 * bottomOffset) + 3] = 0xFF;
+
+            // Top Screen
+
+            for (let y = 0; y < 400; y++) {
+                for (let x = 0; x < 240; x++) {
+                    const srcPtr = (y * 240) - x + topOffset; // 239
+                    const dstPtr = (x * 400) + y;
+
+                    topImage.data[4 * dstPtr + 0] = result[3 * srcPtr + 0];
+                    topImage.data[4 * dstPtr + 1] = result[3 * srcPtr + 1];
+                    topImage.data[4 * dstPtr + 2] = result[3 * srcPtr + 2];
+                    topImage.data[4 * dstPtr + 3] = 0xFF;
                 }
-                // } else {
-                //     console.log("still hit the condition");
-                // }
             }
+
+            // Bottom screen
+
+            for (let y = 0; y < 320; y++) {
+                for (let x = 0; x < 240; x++) {
+                    const srcPtr = (y * 240) - x + btmOffset; // 239
+                    const dstPtr = (x * 320) + y;
+
+                    bottomImage.data[4 * dstPtr + 0] = result[3 * srcPtr + 288000 + 0];
+                    bottomImage.data[4 * dstPtr + 1] = result[3 * srcPtr + 288000 + 1];
+                    bottomImage.data[4 * dstPtr + 2] = result[3 * srcPtr + 288000 + 2];
+                    bottomImage.data[4 * dstPtr + 3] = 0xFF;
+    
+                }
+            }
+
+            /*
+
+            for (var i = 96000; i < 172800; i++) {
+                bottomOffset = i - 96000;
+                bottomImage.data[(4 * bottomOffset) + 0] = result[(3 * i) + 0];
+                bottomImage.data[(4 * bottomOffset) + 1] = result[(3 * i) + 1];
+                bottomImage.data[(4 * bottomOffset) + 2] = result[(3 * i) + 2];
+                bottomImage.data[(4 * bottomOffset) + 3] = 0xFF;
+            }
+
+            */
+
+            // Here is where we would handle any extra data past offset 518400 (including sound data)
+
 
             /*
             bufferTopContext.putImageData(topImage, 0, 0);
@@ -264,6 +291,26 @@ async function writeResult(result) {
             topContext.putImageData(topImage, 0, 0);
             bottomContext.putImageData(bottomImage, 0, 0);
 
+            // Rotate and paint to test screens
+
+
+            //var top2 = document.getElementById("top2");
+            //var bottom2 = document.getElementById("bottom2");
+
+            //var top2Context = top2.getContext('2d');
+            //var bottom2Context = bottom2.getContext('2d');
+
+            //top2Context.rotate(-90);
+            //top2Context.scale(-1,-1);
+            //top2Context.drawImage(topScreen, 0, 0);
+
+            //bottom2Context.rotate(-90);
+            //bottom2Context.drawImage(bottomScreen, 0, 0);
+
+
+
+
+
 
         } else {
 
@@ -276,9 +323,9 @@ async function writeResult(result) {
             for (var i = 0; i < 172800; i++) {
                 readPos = i + frameStartOffset;
                 if ((readPos * 3) + 2 < result.byteLength - byteLengthOffset) {
-                    imageData.data[(4 * i) + 0] = result[(3 * readPos) + rOrder] // ?? 0xFF;
-                    imageData.data[(4 * i) + 1] = result[(3 * readPos) + gOrder] // ?? 0xFF;
-                    imageData.data[(4 * i) + 2] = result[(3 * readPos) + bOrder] // ?? 0xFF;
+                    imageData.data[(4 * i) + 0] = result[(3 * readPos) + rOrder]
+                    imageData.data[(4 * i) + 1] = result[(3 * readPos) + gOrder]
+                    imageData.data[(4 * i) + 2] = result[(3 * readPos) + bOrder]
                     imageData.data[(4 * i) + 3] = 0xFF;
                 }
             }
@@ -315,7 +362,7 @@ function toggleSplitScreen() {
 
     if (doSplitScreen) {
         document.getElementById("canvas-container").style.display = "none";
-        document.getElementById("split-canvas-container").style.display = "block";
+        document.getElementById("split-canvas-container").style.display = "grid";
     } else {
         document.getElementById("canvas-container").style.display = "block";
         document.getElementById("split-canvas-container").style.display = "none";
