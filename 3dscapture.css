@@ -5,6 +5,8 @@
 canvas {
     border:1px solid #F0F;
     background-color: #0F0;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
 }
 
 div#buttons {
