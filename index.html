@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!--<script type="text/javascript" src="./pcm-player.min.js"></script>-->
+    <script>
+
+        //var pcmPlayer;
+
+        function pairUSB() {
+            const filters = [{
+                vendorId: 0x16D0,
+                productId: 0x06A3
+            },];
+            navigator.usb.requestDevice({
+                filters: filters
+            }).then(usbDevice => {
+                log("Product name: " + usbDevice.productName);
+            }).catch(e => {
+                log("There is no device. " + e);
+            });
+        }
+
+        function queryUSB() {
+            navigator.usb.getDevices().then(devices => {
+                log("Total devices: " + devices.length);
+                devices.forEach(device => {
+                    log("Product name: " + device.productName + ", serial number " + device.serialNumber);
+                });
+            });
+        }
+        var device;
+        var poller;
+
+        function startCapture() {
+
+            /*
+            pcmPlayer = new PCMPlayer({
+                encoding: '8bitInt',
+                channels: 1,
+                sampleRate: 8000,
+                flushingTime: 2000
+            });
+            */
+
+            navigator.usb.requestDevice({
+                filters: [{
+                    vendorId: 0x16D0,
+                    productId: 0x06A3
+                }]
+            }).then(selectedDevice => {
+                device = selectedDevice;
+                return device.open(); // Begin a session.
+            }).then(() => device.selectConfiguration(1)) // Select configuration #1 for the device.
+                .then(() => device.claimInterface(0)) // Request exclusive control over interface #2.
+                .then(() => device.controlTransferOut({
+                    requestType: 'vendor',
+                    recipient: 'device',
+                    request: 0x40, //CMDOUT_CAPTURE_START
+                    value: 0x00,
+                    index: 0x00
+                })) // Ready to receive data
+                .then(() => device.transferIn(0x2, (240 * 720 * 3) + 2000)) // Waiting for 64 bytes of data from endpoint #5.
+                .then(result => {
+                    writeResult(result);
+                }).catch(error => {
+                    console.error(error);
+                });
+            poller = setInterval(getFrame, 30);
+        }
+
+        function showTime() {
+            return new Date().toLocaleString().replace(',', '');
+        }
+
+        function getFrame() {
+            device.controlTransferOut({
+                requestType: 'vendor',
+                recipient: 'device',
+                request: 0x40, //CMDOUT_CAPTURE_START
+                value: 0x00,
+                index: 0x00
+            }) // Ready to receive data
+                .then(() => device.transferIn(0x2, (240 * 720 * 3) + 2000)) // Waiting for 64 bytes of data from endpoint #2.
+                .then(result => {
+                    //logStatus(showTime() + ": Got " + result.data.byteLength + " bytes from 3DS");
+                    writeResult(result);
+                }).catch(error => {
+                    console.error(error);
+                });
+        }
+
+        function buf2hex(buffer) { // buffer is an ArrayBuffer
+            return Array.prototype.map.call(new Uint8Array(buffer), x => ('00' + x.toString(16)).slice(-2)).join('');
+        }
+
+
+        function writeResult(result) {
+            logStatus(result.data.byteLength + "(" + (result.data.byteLength / 3) + " out of 172800 pixels)");
+            if (result.data.byteLength > 518144) {
+
+
+                // document.getElementById("hexout").innerText = "";
+                // for (var i = 0; i < 300; i++) {
+                //     document.getElementById("hexout").innerText += "#" + result.data.getUint8(i).toString(16) + result.data.getUint8(i + 1).toString(16) + result.data.getUint8(i + 2).toString(16) + ", ";
+                // }
+
+                var canvas = document.getElementById("screen");
+                var context = canvas.getContext('2d');
+                //	log(typeof rgbaBuf);
+                var imageData = context.createImageData(canvas.width, canvas.height);
+
+
+                for (var i = 0; i < 172800; i++) {
+                    if ((i * 3) + 2 < result.data.byteLength) {
+                        imageData.data[(4 * i) + 0] = result.data.getUint8((3 * i) + 0) // ?? 0xFF;
+                        imageData.data[(4 * i) + 1] = result.data.getUint8((3 * i) + 1) // ?? 0xFF;
+                        imageData.data[(4 * i) + 2] = result.data.getUint8((3 * i) + 2) // ?? 0xFF;
+                        imageData.data[(4 * i) + 3] = 0xFF;
+                    }
+                }
+
+                //for (var i = 518400; i < result.data.byteLength; i++) {
+                //    pcmPlayer.feed(result.data.getUint8(i));
+                //}
+
+                context.putImageData(imageData, 0, 0);
+
+
+
+
+            }
+
+        }
+
+    </script>
+    <style>
+        #hexout {
+            word-break: break-word;
+        }
+
+        #colortest {
+            border: 1px solid black;
+            height: 16px;
+            width: 16px;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <pre id="output"></pre>
+    <pre id="status"></pre>
+    <div id="colortest"></div>
+    <button onclick="pairUSB()">Pair</button>
+    <button onclick="queryUSB()">Query</button>
+    <button onclick="startCapture()">Start</button>
+    <button onclick="clearInterval(poller);">Stop</button>
+    <div id="hexout"></div>
+
+
+    <div style="border:1px solid black; background-color: #FF00FF;">
+        <canvas id="screen" width="240" height="720"></canvas>
+    </div>
+    <audio id="player"></audio>
+
+
+
+    <script>
+        function log(string) {
+            var pre = document.getElementById("output");
+            pre.innerText = pre.innerText + string + "\n";
+        }
+
+        function logStatus(string) {
+            var pre = document.getElementById("status");
+            pre.innerText = string;
+        }
+
+
+        // https://stackoverflow.com/a/30197438/1091442 
+        // define a new console
+        //var console = (function(oldCons) {
+        //    return {
+        //        log: function(text) {
+        //            log("[LOG] " + text);
+        //            // Your code
+        //        },
+        //        info: function(text) {
+        //            log("[INFO] " + text);
+        //            // Your code
+        //        },
+        //        warn: function(text) {
+        //            log("[WARN] " + text);
+        //            oldCons.warn(text);
+        //            // Your code
+        //        },
+        //        error: function(text) {
+        //            log("[ERROR] " + text);
+        //            // Your code
+        //        }
+        //    };
+        //}(window.console));
+        //
+        //window.console = console;
+        //
+        //console.log("test");
+    </script>
+</body>
+
+</html>
