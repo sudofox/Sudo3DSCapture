@@ -49,7 +49,11 @@ var bottomScreenSize = 230400;
 
 // Choose how frequently we do the updates (you'll need to stop and start capture for it to take effect)
 
-var pollFrequency = 30;
+// 35 seems to minimize the glitchy frames
+// 1000/35 is a bit under 30 FPS
+// This is one more thing that should be fixable by fixing when we have incomplete frame data
+
+var pollFrequency = 35;
 
 // Split screen off by default
 
@@ -59,6 +63,10 @@ var doSplitScreen = 0;
 // This won't be needed once we can work out how to pull the entire frame data from multiple packets before rendering
 
 var lastDataPacketTooSmall = false;
+
+// De-asyncing thingy that doesn't seem to do much to help
+var droppedFrames = 0;
+var lastDrawCompleted = true;
 
 var device, poller;
 
@@ -113,7 +121,11 @@ function getFrame() {
         index: 0x00
     }).then(() => device.transferIn(CAPTURE_ENDPOINT, (FRAMESIZE + extraDataSize)))
         .then(result => {
-            writeResult(result);
+            if (lastDrawCompleted) {
+                writeResult(result);
+            } else {
+                droppedFrames++;
+            }
         }).catch(error => {
             console.error(error);
         });
@@ -121,6 +133,8 @@ function getFrame() {
 
 
 function writeResult(result) {
+
+    lastDrawCompleted = false;
 
     logStatus(result.data.byteLength + "(" + (result.data.byteLength / 3) + " out of 172800 pixels)");
     console.log(result.data.byteLength);
@@ -137,8 +151,26 @@ function writeResult(result) {
             var topContext = topScreen.getContext('2d');
             var bottomContext = bottomScreen.getContext('2d');
 
-            var topImage = topContext.createImageData(topScreen.width, topScreen.height);
-            var bottomImage = bottomContext.createImageData(bottomScreen.width, bottomScreen.height);
+            // putImageData doesn't work with rotation so we're using a buffer canvas
+
+            /*
+
+            var bufferTop = document.createElement('canvas');
+            var bufferBottom = document.createElement('canvas');
+
+            bufferTop.width = bufferBottom.width = 240;
+            bufferTop.height = 400;
+            bufferBottom.height = 320;
+
+            var bufferTopContext = bufferTop.getContext('2d');
+            var bufferBottomContext = bufferBottom.getContext('2d');
+
+            var topImage = bufferTopContext.createImageData(bufferTop.width, bufferTop.height);
+            var bottomImage = bufferBottomContext.createImageData(bufferBottom.width, bufferBottom.height);
+            */
+
+           var topImage = topContext.createImageData(topScreen.width, topScreen.height);
+           var bottomImage = bottomContext.createImageData(bottomScreen.width, bottomScreen.height);
 
             // foreach number of pixels
             for (var i = 0; i < 172800; i++) {
@@ -159,8 +191,23 @@ function writeResult(result) {
                 }
             }
 
-            topContext.putImageData(topImage, 0, 0);
-            bottomContext.putImageData(bottomImage, 0, 0);
+            /*
+            bufferTopContext.putImageData(topImage, 0, 0);
+            bufferBottomContext.putImageData(bottomImage, 0, 0);
+
+            // For some reason this is just making things spin wildly, disabled for now
+
+            topContext.rotate(-90);
+            topContext.drawImage(bufferTop, 0, 0);
+
+            bottomContext.rotate(-90);
+            bottomContext.drawImage(bufferBottom, 0, 0);
+            
+            */
+
+           topContext.putImageData(topImage, 0, 0);
+           bottomContext.putImageData(bottomImage, 0, 0);
+
 
         } else {
 
@@ -186,11 +233,16 @@ function writeResult(result) {
 
             context.putImageData(imageData, 0, 0);
         }
+
+
     } else if (result.data.byteLength >= 518144) {
         lastDataPacketTooSmall = false;
     } else {
         lastDataPacketTooSmall = true;
     }
+
+    lastDrawCompleted = true;
+    droppedFrames = 0;
 
 }
 
