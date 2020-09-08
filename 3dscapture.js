@@ -49,11 +49,11 @@ var bottomScreenSize = 230400;
 
 // Choose how frequently we do the updates (you'll need to stop and start capture for it to take effect)
 
-// 35 seems to minimize the glitchy frames
+// 36 seems to minimize the glitchy frames
 // 1000/35 is a bit under 30 FPS
 // This is one more thing that should be fixable by fixing when we have incomplete frame data
 
-var pollFrequency = 35;
+var pollFrequency = 36;
 
 // Split screen off by default
 
@@ -67,7 +67,6 @@ var lastDataPacketTooSmall = false;
 // De-asyncing thingy that doesn't seem to do much to help
 var droppedFrames = 0;
 var lastDrawCompleted = true;
-var gettingFrame = false;
 
 var device, poller;
 
@@ -106,61 +105,93 @@ function startCapture() {
         pairUSB();
     }
 
-    //gettingFrame = false;
-    //lastDrawCompleted = true;
+    lastDrawCompleted = true;
 
     poller = setInterval(getFrame, pollFrequency);
 }
 
 function stopCapture() {
     clearInterval(poller);
-    gettingFrame = false;
     lastDrawCompleted = true;
 }
 
-function setFrameDelay() {
-    pollFrequency = document.getElementById("frame_delay_select").value;
+function setFrameDelay(delay) {
+    pollFrequency = delay;
 }
 
-function getFrame() {
 
-//    if (gettingFrame) {
-//        return;
-//    } else {
-//        gettingFrame = true;
-//    }
+function getBytesIn(endpoint, length) {
+    return device.transferIn(endpoint, length)
+        .then(result => { return result })
+        .catch(error => { console.error("getBytesIn: " + error) });
+}
+
+async function getFrame() {
+
+    if (!lastDrawCompleted) { return; }
 
     // Send 0x40 to request frame
-    device.controlTransferOut({
+    await device.controlTransferOut({
         requestType: 'vendor',
         recipient: 'device',
         request: CMDOUT_CAPTURE_START,
         value: 0x00,
         index: 0x00
-    }).then(() => device.transferIn(CAPTURE_ENDPOINT, (FRAMESIZE + extraDataSize)))
-        .then(result => {
-            if (lastDrawCompleted) {
-                writeResult(result);
-            } else {
-                droppedFrames++;
+    });
+
+    let transferSize;
+    let bytesNeeded = FRAMESIZE + extraDataSize;
+    let frameData = new Uint8Array(bytesNeeded);
+    let bytesIn = 0;
+
+    //console.log("we need " + bytesNeeded);
+
+    do {
+        transferSize = ((FRAMESIZE - bytesIn) + 0x1ff) & ~0x1ff;
+        const result = await getBytesIn(CAPTURE_ENDPOINT, transferSize)
+            .catch(error => {
+                console.error("getFrame inner do loop: " + error);
+            });
+
+        //console.log(result.data.byteLength);
+
+        if (result.status == "ok") {
+
+            for (i = 0; i < result.data.byteLength; i++) {
+                frameData[bytesIn + i] = result.data.getUint8(i);
             }
-        }).catch(error => {
-            console.error(error);
-        });
-    //gettingFrame = false;
+
+            bytesIn = (bytesIn + result.data.byteLength);
+
+        } else {
+            // something didn't happen right
+            console.error("error thingy");
+        }
+
+    //} while (bytesIn < bytesNeeded)
+
+    } while (false);
+
+    if (lastDrawCompleted) {
+        await writeResult(frameData);
+    }
+
 }
 
 
-function writeResult(result) {
+async function writeResult(result) {
 
     lastDrawCompleted = false;
 
-    logStatus(result.data.byteLength + "(" + (result.data.byteLength / 3) + " out of 172800 pixels)");
-    console.log(result.data.byteLength);
+    //console.log(result);
+
+    logStatus(result.byteLength + "(" + (result.byteLength / 3) + " out of 172800 pixels)");
+    //console.log(result.byteLength);
     // Hacky if condition that doesn't solve the underlying issue of incomplete/misread frame 
     // lastDataPacketTooSmall just skips frames after we manage to pick up on the "remaing frame data" bulk_in sent
     // All this will be solved once we fix that.
-    if (result.data.byteLength >= 518144 && !lastDataPacketTooSmall) {
+
+    if (result.byteLength >= 518144 && !lastDataPacketTooSmall) {
 
         if (doSplitScreen) {
 
@@ -170,8 +201,8 @@ function writeResult(result) {
             var topContext = topScreen.getContext('2d');
             var bottomContext = bottomScreen.getContext('2d');
 
-            topContext.clearRect(0, 0, topScreen.width, topScreen.height);
-            bottomContext.clearRect(0, 0, bottomScreen.width, bottomScreen.height);
+            //topContext.clearRect(0, 0, topScreen.width, topScreen.height);
+            //bottomContext.clearRect(0, 0, bottomScreen.width, bottomScreen.height);
 
 
             // putImageData doesn't work with rotation so we're using a buffer canvas
@@ -198,20 +229,22 @@ function writeResult(result) {
             // foreach number of pixels
             for (var i = 0; i < 172800; i++) {
                 readPos = i + frameStartOffset;
-                if ((readPos * 3) + 2 < result.data.byteLength - byteLengthOffset) {
-                    if (i < 96000) {
-                        topImage.data[(4 * i) + 0] = result.data.getUint8((3 * readPos) + rOrder) // ?? 0xFF;
-                        topImage.data[(4 * i) + 1] = result.data.getUint8((3 * readPos) + gOrder) // ?? 0xFF;
-                        topImage.data[(4 * i) + 2] = result.data.getUint8((3 * readPos) + bOrder) // ?? 0xFF;
-                        topImage.data[(4 * i) + 3] = 0xFF;
-                    } else {
-                        bottomOffset = i - 96000;
-                        bottomImage.data[(4 * bottomOffset) + 0] = result.data.getUint8((3 * readPos) + rOrder) // ?? 0xFF;
-                        bottomImage.data[(4 * bottomOffset) + 1] = result.data.getUint8((3 * readPos) + gOrder) // ?? 0xFF;
-                        bottomImage.data[(4 * bottomOffset) + 2] = result.data.getUint8((3 * readPos) + bOrder) // ?? 0xFF;
-                        bottomImage.data[(4 * bottomOffset) + 3] = 0xFF;
-                    }
+                //if ((readPos * 3) + 2 < result.byteLength - byteLengthOffset) {
+                if (i < 96000) {
+                    topImage.data[(4 * i) + 0] = result[(3 * readPos) + rOrder]; // ?? 0xFF;
+                    topImage.data[(4 * i) + 1] = result[(3 * readPos) + gOrder]; // ?? 0xFF;
+                    topImage.data[(4 * i) + 2] = result[(3 * readPos) + bOrder]; // ?? 0xFF;
+                    topImage.data[(4 * i) + 3] = 0xFF;
+                } else {
+                    bottomOffset = i - 96000;
+                    bottomImage.data[(4 * bottomOffset) + 0] = result[(3 * readPos) + rOrder]; // ?? 0xFF;
+                    bottomImage.data[(4 * bottomOffset) + 1] = result[(3 * readPos) + gOrder]; // ?? 0xFF;
+                    bottomImage.data[(4 * bottomOffset) + 2] = result[(3 * readPos) + bOrder]; // ?? 0xFF;
+                    bottomImage.data[(4 * bottomOffset) + 3] = 0xFF;
                 }
+                // } else {
+                //     console.log("still hit the condition");
+                // }
             }
 
             /*
@@ -242,10 +275,10 @@ function writeResult(result) {
             // foreach number of pixels
             for (var i = 0; i < 172800; i++) {
                 readPos = i + frameStartOffset;
-                if ((readPos * 3) + 2 < result.data.byteLength - byteLengthOffset) {
-                    imageData.data[(4 * i) + 0] = result.data.getUint8((3 * readPos) + rOrder) // ?? 0xFF;
-                    imageData.data[(4 * i) + 1] = result.data.getUint8((3 * readPos) + gOrder) // ?? 0xFF;
-                    imageData.data[(4 * i) + 2] = result.data.getUint8((3 * readPos) + bOrder) // ?? 0xFF;
+                if ((readPos * 3) + 2 < result.byteLength - byteLengthOffset) {
+                    imageData.data[(4 * i) + 0] = result[(3 * readPos) + rOrder] // ?? 0xFF;
+                    imageData.data[(4 * i) + 1] = result[(3 * readPos) + gOrder] // ?? 0xFF;
+                    imageData.data[(4 * i) + 2] = result[(3 * readPos) + bOrder] // ?? 0xFF;
                     imageData.data[(4 * i) + 3] = 0xFF;
                 }
             }
@@ -261,7 +294,15 @@ function writeResult(result) {
     } else if (result.data.byteLength >= 518144) {
         lastDataPacketTooSmall = false;
     } else {
-        lastDataPacketTooSmall = true;
+        if (!lastDataPacketTooSmall) {
+            // automatically adjust poll frequency, but only once
+            if (result.data.byteLength > 0 && !(result.data.byteLength > 4000 && result.data.byteLength < 4500)) {
+                document.getElementById("frame_delay_select").stepUp();
+                document.getElementById("frame_delay_select").onchange();
+            }
+        } else {
+            lastDataPacketTooSmall = true;
+        }
     }
 
     lastDrawCompleted = true;

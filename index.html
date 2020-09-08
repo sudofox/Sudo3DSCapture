@@ -24,8 +24,8 @@
         <button onclick="startCapture()">Start</button>
         <button onclick="stopCapture()">Stop</button>
         <button onclick="toggleSplitScreen()">Toggle Split</button>
-        <input type="number" min="0" max="500" id="frame_delay_select" value="0">
-        <button onclick="stopCapture(); setFrameDelay(); startCapture()">Update Frame Delay</button>
+        <span>Frame Delay: </span>
+        <input onchange="setFrameDelay(this.value); stopCapture(); startCapture();" type="number" min="0" max="500" id="frame_delay_select" value="1">
     </div>
 
     <div id="canvas-container" style="display: none;">
