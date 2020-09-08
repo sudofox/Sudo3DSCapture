@@ -57,7 +57,7 @@ var pollFrequency = 35;
 
 // Split screen off by default
 
-var doSplitScreen = 0;
+var doSplitScreen = true;
 
 // Hack to skip render if previous data was < 518144
 // This won't be needed once we can work out how to pull the entire frame data from multiple packets before rendering
@@ -67,6 +67,7 @@ var lastDataPacketTooSmall = false;
 // De-asyncing thingy that doesn't seem to do much to help
 var droppedFrames = 0;
 var lastDrawCompleted = true;
+var gettingFrame = false;
 
 var device, poller;
 
@@ -104,14 +105,31 @@ function startCapture() {
     if (typeof device != "object") {
         pairUSB();
     }
+
+    //gettingFrame = false;
+    //lastDrawCompleted = true;
+
     poller = setInterval(getFrame, pollFrequency);
 }
 
 function stopCapture() {
     clearInterval(poller);
+    gettingFrame = false;
+    lastDrawCompleted = true;
+}
+
+function setFrameDelay() {
+    pollFrequency = document.getElementById("frame_delay_select").value;
 }
 
 function getFrame() {
+
+//    if (gettingFrame) {
+//        return;
+//    } else {
+//        gettingFrame = true;
+//    }
+
     // Send 0x40 to request frame
     device.controlTransferOut({
         requestType: 'vendor',
@@ -129,6 +147,7 @@ function getFrame() {
         }).catch(error => {
             console.error(error);
         });
+    //gettingFrame = false;
 }
 
 
@@ -151,6 +170,10 @@ function writeResult(result) {
             var topContext = topScreen.getContext('2d');
             var bottomContext = bottomScreen.getContext('2d');
 
+            topContext.clearRect(0, 0, topScreen.width, topScreen.height);
+            bottomContext.clearRect(0, 0, bottomScreen.width, bottomScreen.height);
+
+
             // putImageData doesn't work with rotation so we're using a buffer canvas
 
             /*
@@ -169,8 +192,8 @@ function writeResult(result) {
             var bottomImage = bufferBottomContext.createImageData(bufferBottom.width, bufferBottom.height);
             */
 
-           var topImage = topContext.createImageData(topScreen.width, topScreen.height);
-           var bottomImage = bottomContext.createImageData(bottomScreen.width, bottomScreen.height);
+            var topImage = topContext.createImageData(topScreen.width, topScreen.height);
+            var bottomImage = bottomContext.createImageData(bottomScreen.width, bottomScreen.height);
 
             // foreach number of pixels
             for (var i = 0; i < 172800; i++) {
@@ -205,8 +228,8 @@ function writeResult(result) {
             
             */
 
-           topContext.putImageData(topImage, 0, 0);
-           bottomContext.putImageData(bottomImage, 0, 0);
+            topContext.putImageData(topImage, 0, 0);
+            bottomContext.putImageData(bottomImage, 0, 0);
 
 
         } else {

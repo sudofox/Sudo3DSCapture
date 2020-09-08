@@ -24,15 +24,20 @@
         <button onclick="startCapture()">Start</button>
         <button onclick="stopCapture()">Stop</button>
         <button onclick="toggleSplitScreen()">Toggle Split</button>
+        <input type="number" min="0" max="500" id="frame_delay_select" value="0">
+        <button onclick="stopCapture(); setFrameDelay(); startCapture()">Update Frame Delay</button>
     </div>
 
-    <div id="canvas-container">
+    <div id="canvas-container" style="display: none;">
         <canvas id="screen" width="240" height="720"></canvas>
     </div>
-    <div id="split-canvas-container" style="display: none;">
+    <div id="split-canvas-container" style="display: block;">
         <canvas id="topscreen" width="240" height="400"></canvas>
         <canvas id="bottomscreen" width="240" height="320"></canvas>
     </div>
+    <script>
+        document.getElementById("frame_delay_select").value = pollFrequency;
+    </script>
 </body>
 
 </html>
