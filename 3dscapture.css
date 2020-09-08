@@ -1,0 +1,8 @@
+#hexout {
+    word-break: break-word;
+}
+
+#canvas-container {
+    border:1px solid black;
+    background-color: #FF00FF;
+}
