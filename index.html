@@ -3,7 +3,6 @@
 
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!--<script type="text/javascript" src="./pcm-player.min.js"></script>-->
     <title>Sudo3DSCapture</title>
     <script type="text/javascript" src="./3dscapture.js"></script>
     <link rel="stylesheet" href="./3dscapture.css">
@@ -11,15 +10,28 @@
 
 <body>
 
-    <pre id="output"></pre>
-    <pre id="status"></pre>
-    <button onclick="pairUSB()">Pair</button>
-    <button onclick="queryUSB()">Query</button>
-    <button onclick="startCapture()">Start</button>
-    <button onclick="clearInterval(poller);">Stop</button>
-    <div id="hexout"></div>
+    <h1>Sudo3DSCapture</h1>
+    <!-- Debug -->
+    <div id="debug-info">
+        <pre id="output"></pre>
+        <pre id="status"></pre>
+        <div id="hexout"></div>
+    </div>
+    <!-- Buttons -->
+    <div id="buttons">
+        <button onclick="pairUSB()">Pair</button>
+        <button onclick="queryUSB()">Query</button>
+        <button onclick="startCapture()">Start</button>
+        <button onclick="stopCapture()">Stop</button>
+        <button onclick="toggleSplitScreen()">Toggle Split</button>
+    </div>
+
     <div id="canvas-container">
         <canvas id="screen" width="240" height="720"></canvas>
+    </div>
+    <div id="split-canvas-container" style="display: none;">
+        <canvas id="topscreen" width="240" height="400"></canvas>
+        <canvas id="bottomscreen" width="240" height="320"></canvas>
     </div>
 </body>
 

@@ -2,7 +2,18 @@
     word-break: break-word;
 }
 
+canvas {
+    border:1px solid #F0F;
+    background-color: #0F0;
+}
+
+div#buttons {
+    margin-bottom: 5px;
+}
+
+/* 
 #canvas-container {
     border:1px solid black;
     background-color: #FF00FF;
 }
+*/
